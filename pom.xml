@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.4.1</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>sparkintech</groupId>
+  <artifactId>com</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+
+  <!-- If you really need WAR for an external servlet container, keep war.
+       If you're running embedded (java -jar), consider jar instead. -->
+  <packaging>war</packaging>
+
+  <name>com</name>
+  <description>Demo project for Spring Boot</description>
+
+  <properties>
+    <!-- Boot 3.4 supports Java 17+; use 21 for best LTS compatibility.
+         Java 25 is not a good target for most Spring stacks yet. -->
+    <java.version>21</java.version>
+  </properties>
+
+  <dependencies>
+    <!-- MVC + Jackson auto-config (ObjectMapper bean) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- WebSocket support -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-websocket</artifactId>
+    </dependency>
+
+    <!-- Validation (instead of manually pinning jakarta.validation-api) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
+    <!-- Ensures embedded websocket module is present (important for WS on embedded Tomcat) -->
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-websocket</artifactId>
+    </dependency>
+
+    <!-- If deploying WAR to an external Tomcat, keep provided.
+         If running embedded (java -jar), REMOVE this dependency entirely. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-tomcat</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
