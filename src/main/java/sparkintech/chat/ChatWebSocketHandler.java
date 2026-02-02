@@ -1,14 +1,12 @@
 package sparkintech.chat;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import sparkintech.chat.api.dto.WsChatEvent;
-import sparkintech.chat.api.dto.WsChatRequest;
-import sparkintech.chat.api.service.LlmStreamService;
-
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import sparkintech.chat.api.service.LlmStreamService;
+import sparkintech.chat.api.store.ChatHistoryStore;
 
 import java.util.concurrent.*;
 
@@ -17,34 +15,58 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final LlmStreamService service;
     private final ObjectMapper mapper;
+    private final ChatHistoryStore store;
 
-    // One worker thread per request is fine to start; later you can tune pooling.
     private final ExecutorService executor = Executors.newCachedThreadPool();
-
-    // Optional: allow only 1 active stream per websocket session
     private final ConcurrentHashMap<String, Future<?>> running = new ConcurrentHashMap<>();
 
-    public ChatWebSocketHandler(LlmStreamService service, ObjectMapper mapper) {
+    public ChatWebSocketHandler(LlmStreamService service, ObjectMapper mapper, ChatHistoryStore store) {
         this.service = service;
         this.mapper = mapper;
+        this.store = store;
     }
 
     @Override
     public void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        // Cancel any previous stream on this same WS session
-        Future<?> prev = running.remove(session.getId());
-        if (prev != null)
-            prev.cancel(true);
+        JsonNode root = mapper.readTree(message.getPayload());
+        String type = root.path("type").asText("chat");
 
-        WsChatRequest req = mapper.readValue(message.getPayload(), WsChatRequest.class);
+        if ("cancel".equals(type)) {
+            cancelJob(session);
+            safeSend(session, mapper.createObjectNode().put("type", "cancelled"));
+            return;
+        }
+
+        // default: chat
+        String sessionId = root.path("sessionId").asText("default");
+        String model = root.path("model").asText(null);
+        String prompt = root.path("prompt").asText("");
+
+        if (prompt.isBlank()) {
+            safeSend(session, mapper.createObjectNode().put("type", "error").put("message", "prompt is empty"));
+            return;
+        }
+
+        // cancel previous stream for this socket session
+        cancelJob(session);
 
         Future<?> job = executor.submit(() -> {
             try {
-                service.streamChat(req.model(), req.prompt(),
-                        delta -> safeSend(session, WsChatEvent.delta(delta)),
-                        () -> safeSend(session, WsChatEvent.done()));
+                store.append(sessionId, "USER: " + prompt);
+
+                StringBuilder full = new StringBuilder();
+
+                service.streamChat(model, prompt,
+                        delta -> {
+                            full.append(delta);
+                            safeSend(session, mapper.createObjectNode().put("type", "delta").put("content", delta));
+                        },
+                        () -> {
+                            store.append(sessionId, "AI: " + full);
+                            safeSend(session, mapper.createObjectNode().put("type", "done"));
+                        });
             } catch (Exception e) {
-                safeSend(session, WsChatEvent.error(e.getMessage()));
+                safeSend(session, mapper.createObjectNode().put("type", "error").put("message", e.getMessage()));
             }
         });
 
@@ -53,21 +75,24 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        Future<?> job = running.remove(session.getId());
-        if (job != null)
-            job.cancel(true);
+        cancelJob(session);
     }
 
-    private void safeSend(WebSocketSession session, WsChatEvent event) {
+    private void cancelJob(WebSocketSession session) {
+        Future<?> prev = running.remove(session.getId());
+        if (prev != null)
+            prev.cancel(true);
+    }
+
+    private void safeSend(WebSocketSession session, JsonNode node) {
         try {
             if (!session.isOpen())
                 return;
-            String json = mapper.writeValueAsString(event);
+            String json = node.toString();
             synchronized (session) {
                 session.sendMessage(new TextMessage(json));
             }
         } catch (Exception ignored) {
-            // client likely disconnected
         }
     }
 }

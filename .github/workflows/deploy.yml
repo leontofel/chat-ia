@@ -1,0 +1,56 @@
+name: Deploy Backend (Docker -> VPS)
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install sshpass + rsync
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass rsync
+
+      - name: Add VPS host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Build Docker image
+        run: |
+          docker build -t chat-backend:${{ github.sha }} .
+          docker tag chat-backend:${{ github.sha }} chat-backend:current
+
+      - name: Save image to tar.gz
+        run: |
+          docker save chat-backend:current | gzip > chat-backend.tar.gz
+          ls -lh chat-backend.tar.gz
+
+      - name: Upload image + compose to VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -P "${{ secrets.VPS_PORT }}" \
+            chat-backend.tar.gz docker-compose.vps.yml \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/srv/apps/chat-backend/"
+
+      - name: Load image and restart with docker compose
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p "${{ secrets.VPS_PORT }}" \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/apps/chat-backend && \
+             gunzip -c chat-backend.tar.gz | docker load && \
+             docker compose -f docker-compose.vps.yml up -d --remove-orphans && \
+             docker image prune -f && \
+             docker ps --filter name=chat-backend"

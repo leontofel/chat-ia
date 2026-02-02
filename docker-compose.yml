@@ -1,0 +1,14 @@
+services:
+  chat-backend:
+    image: chat-backend:current
+    container_name: chat-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # If Ollama is running on the VPS host and exposed on 11434:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # Linux doesn't support host.docker.internal by default on all installs.
+      # If that fails, use the VPS IP or localhost with host networking, or run Ollama in docker too.
+      # Example:
+      # - OLLAMA_BASE_URL=http://127.0.0.1:11434
