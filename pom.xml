@@ -17,7 +17,9 @@
 
   <!-- If you really need WAR for an external servlet container, keep war.
        If you're running embedded (java -jar), consider jar instead. -->
-  <packaging>war</packaging>
+  <!-- <packaging>war</packaging> -->
+  <packaging>jar</packaging>
+
 
   <name>com</name>
   <description>Demo project for Spring Boot</description>
