@@ -20,7 +20,14 @@ public class LlmStreamService {
     }
 
     public void streamChat(String modelOrNull, String prompt, Consumer<String> onDelta, Runnable onDone) {
-        String model = (modelOrNull == null || modelOrNull.isBlank()) ? defaultModel : modelOrNull;
-        repo.streamChat(model, prompt, onDelta, onDone);
+        try {
+            String model = (modelOrNull == null || modelOrNull.isBlank()) ? defaultModel : modelOrNull;
+            repo.streamChat(model, prompt, onDelta, onDone);
+        } catch(Error e) {
+                System.out.println("Streaming from Ollama failed: " + e); // prints stacktrace
+                throw new RuntimeException("Streaming from Ollama failed: " + e.getClass().getName(), e);
+              
+              
+        }
     }
 }
