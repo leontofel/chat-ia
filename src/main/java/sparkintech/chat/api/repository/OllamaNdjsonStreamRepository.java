@@ -81,6 +81,8 @@ public class OllamaNdjsonStreamRepository implements LlmStreamRepository {
                 }
             }
         } catch (Exception e) {
+            System.out.println(e);
+            System.out.println(e.getStackTrace());
             throw new RuntimeException("Streaming from Ollama failed: " + e.getMessage(), e);
         }
     }
